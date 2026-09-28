@@ -13,11 +13,14 @@ class RecordsPage extends StatefulWidget {
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
+    required this.onExport,
+    required this.onStar,
   });
   final List<ApplicationRecord> records;
   final int threshold;
   final String initialFilter;
-  final VoidCallback onAdd;
+  final VoidCallback onAdd, onExport;
+  final ValueChanged<ApplicationRecord> onStar;
   final ValueChanged<ApplicationRecord> onOpen, onEdit, onDelete;
   @override
   State<RecordsPage> createState() => _RecordsPageState();
@@ -45,6 +48,8 @@ class _RecordsPageState extends State<RecordsPage> {
         '进行中' => r.isActive,
         '已结束' => !r.isActive,
         '长期无响应' => r.isStale(now, widget.threshold),
+        '重点收藏' => r.starred,
+        '跟进计划' => r.isActive && r.followUpAt != null,
         _ => r.stage == filter && r.isActive,
       };
       return matches && included;
@@ -77,6 +82,12 @@ class _RecordsPageState extends State<RecordsPage> {
                 ],
               ),
             ),
+            IconButton(
+              tooltip: '导出全部记录 CSV',
+              onPressed: widget.onExport,
+              icon: const Icon(Icons.download_outlined, color: accent),
+            ),
+            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: widget.onAdd,
               icon: const Icon(Icons.add, size: 19),
@@ -114,7 +125,7 @@ class _RecordsPageState extends State<RecordsPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: ['全部', '进行中', ...stages, '长期无响应', '已结束']
+          children: ['全部', '进行中', '重点收藏', '跟进计划', ...stages, '长期无响应', '已结束']
               .map(
                 (s) => ChoiceChip(
                   label: Text(s, style: const TextStyle(fontSize: 12)),
@@ -200,7 +211,26 @@ class _RecordsPageState extends State<RecordsPage> {
                                       flex: 5,
                                       child: Row(
                                         children: [
-                                          companyAvatar(r.company),
+                                          InkWell(
+                                            onTap: () => widget.onStar(r),
+                                            child: Tooltip(
+                                              message: r.starred
+                                                  ? '取消收藏'
+                                                  : '收藏机会',
+                                              child: r.starred
+                                                  ? const SizedBox(
+                                                      width: 40,
+                                                      height: 40,
+                                                      child: Icon(
+                                                        Icons.star_rounded,
+                                                        color: Color(
+                                                          0xFFB7862D,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : companyAvatar(r.company),
+                                            ),
+                                          ),
                                           const SizedBox(width: 14),
                                           Expanded(
                                             child: Column(

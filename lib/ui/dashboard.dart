@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/models.dart';
 import 'widgets.dart';
+import 'followups.dart';
 
 class Dashboard extends StatelessWidget {
   const Dashboard({
@@ -10,11 +11,13 @@ class Dashboard extends StatelessWidget {
     required this.onAdd,
     required this.onOpen,
     required this.onFilter,
+    required this.onComplete,
   });
   final List<ApplicationRecord> records;
   final int threshold;
   final VoidCallback onAdd;
   final ValueChanged<ApplicationRecord> onOpen;
+  final ValueChanged<ApplicationRecord> onComplete;
   final ValueChanged<String> onFilter;
   @override
   Widget build(BuildContext context) {
@@ -157,6 +160,12 @@ class Dashboard extends StatelessWidget {
           style: TextStyle(color: muted, fontSize: 11),
         ),
         const SizedBox(height: 24),
+        FollowUpsPanel(
+          records: records,
+          onOpen: onOpen,
+          onComplete: onComplete,
+          onViewAll: () => onFilter('跟进计划'),
+        ),
         Surface(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

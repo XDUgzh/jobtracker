@@ -28,12 +28,22 @@ class ApplicationRecord {
     this.url = '',
     this.notes = '',
     this.resumeId,
+    this.followUpAt,
+    this.nextAction = '',
+    this.starred = false,
     required this.lastProgress,
   });
   final int? id;
   final String company, position, stage, status, source, url, notes;
   final DateTime appliedAt, lastProgress;
   final int? resumeId;
+  final DateTime? followUpAt;
+  final String nextAction;
+  final bool starred;
+  bool isDue(DateTime now) =>
+      isActive &&
+      followUpAt != null &&
+      !calendarDate(followUpAt!).isAfter(calendarDate(now));
   bool get isActive => status == '进行中';
   int waitingDays(DateTime now) => calendarDays(lastProgress, now);
   bool isStale(DateTime now, int threshold) =>
@@ -50,6 +60,11 @@ class ApplicationRecord {
         url: row['url'] as String,
         notes: row['notes'] as String,
         resumeId: row['resume_id'] as int?,
+        followUpAt: row['follow_up_at'] == null
+            ? null
+            : DateTime.parse(row['follow_up_at'] as String),
+        nextAction: row['next_action'] as String? ?? '',
+        starred: row['starred'] == 1,
         lastProgress: DateTime.parse(row['last_progress'] as String),
       );
 }

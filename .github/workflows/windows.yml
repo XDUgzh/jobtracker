@@ -1,0 +1,29 @@
+name: Windows checks and build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build distributable desktop app
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JobTracker-Windows-x64
+          path: dist/JobTracker-Windows-x64/

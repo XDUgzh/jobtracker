@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'data/database.dart';
 import 'data/models.dart';
+import 'data/transfer.dart';
 import 'ui/forms.dart';
 import 'ui/widgets.dart';
 import 'ui/dashboard.dart';
@@ -78,9 +80,126 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
 
   void message(String text) {
     if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
       );
+    }
+  }
+
+  void star(ApplicationRecord record) {
+    try {
+      db.toggleStar(record.id!);
+      reload();
+    } catch (e) {
+      message('收藏失败：$e');
+    }
+  }
+
+  void completeFollowUp(ApplicationRecord record) {
+    try {
+      db.completeFollowUp(record.id!);
+      reload();
+      message('跟进计划已完成，招聘进度保持不变');
+    } catch (e) {
+      message('保存失败：$e');
+    }
+  }
+
+  Future<void> transfer(String action) async {
+    try {
+      String? target;
+      if (action == 'restore') {
+        final file = await openFile(
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'JobTracker 备份',
+              extensions: ['jobtracker'],
+            ),
+          ],
+        );
+        if (file == null || !mounted) return;
+        target = file.path;
+        final approved = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('用备份恢复全部数据？'),
+            content: const Text(
+              '恢复会替换当前全部求职记录、时间轴、简历与设置。系统会先验证备份，并自动保存恢复前的数据到本机 backups 文件夹。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('恢复备份'),
+              ),
+            ],
+          ),
+        );
+        if (approved != true) return;
+      } else {
+        final extension = action == 'csv' ? 'csv' : 'jobtracker';
+        final location = await getSaveLocation(
+          suggestedName: 'JobTracker-${dateText(DateTime.now())}.$extension',
+          acceptedTypeGroups: [
+            XTypeGroup(
+              label: action == 'csv' ? 'Excel CSV' : 'JobTracker 备份',
+              extensions: [extension],
+            ),
+          ],
+        );
+        if (location == null || !mounted) return;
+        target = location.path;
+      }
+      if (!mounted) return;
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const PopScope(
+            canPop: false,
+            child: AlertDialog(
+              content: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 20),
+                  Text('正在处理本地数据…'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      String result;
+      try {
+        if (action == 'csv') {
+          await File(
+            target,
+          ).writeAsBytes(utf8.encode(DataTransfer.csv(db)), flush: true);
+          result = 'CSV 已导出，可用 Excel 打开';
+        } else if (action == 'backup') {
+          await DataTransfer.backup(db, target);
+          result = '备份已保存，包含全部记录和简历副本';
+        } else {
+          final safetyCopy = await DataTransfer.restore(db, target);
+          selected = null;
+          result = '恢复完成。恢复前备份：$safetyCopy';
+        }
+      } finally {
+        if (mounted) Navigator.of(context).pop();
+      }
+      reload();
+      message(result);
+    } catch (e) {
+      message('操作未完成：$e');
     }
   }
 
@@ -314,7 +433,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                 const Padding(
                   padding: EdgeInsets.fromLTRB(28, 12, 20, 22),
                   child: Text(
-                    'WINDOWS  /  v1.0.0',
+                    'WINDOWS  /  v1.1.0',
                     style: TextStyle(
                       fontSize: 10,
                       color: muted,
@@ -366,6 +485,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                         threshold: threshold,
                         onAdd: () => edit(),
                         onOpen: showRecord,
+                        onComplete: completeFollowUp,
                         onFilter: (filter) => setState(() {
                           page = 1;
                           selected = null;
@@ -383,6 +503,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                                 onOpen: showRecord,
                                 onEdit: edit,
                                 onDelete: remove,
+                                onExport: () => transfer('csv'),
+                                onStar: star,
                               )
                             : DetailPage(
                                 record: current,
@@ -397,6 +519,8 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
                                 onEvent: () => event(current),
                                 onOpenFile: openLocal,
                                 onOpenLink: openLink,
+                                onStar: () => star(current),
+                                onComplete: () => completeFollowUp(current),
                               ),
                       2 => resumePage(),
                       _ => settingsPage(),
@@ -629,6 +753,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             SizedBox(
               width: 240,
               child: DropdownButtonFormField<int>(
+                key: ValueKey('threshold-$threshold'),
                 initialValue: threshold,
                 decoration: const InputDecoration(labelText: '多久没有进展时提醒'),
                 items: ({7, 14, 21, 30, 60, threshold}.toList()..sort())
@@ -661,12 +786,34 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 12),
             const Text(
-              '全部记录及简历副本保存在以下目录。备份时先关闭应用，再复制整个目录；恢复时关闭应用，用备份替换此目录。',
+              '一键备份包含全部记录、时间轴和简历副本。恢复会替换当前数据，并自动保留恢复前备份。CSV 可用于 Excel 分析，不能作为完整备份。',
               style: TextStyle(color: muted, height: 1.8),
             ),
             const SizedBox(height: 16),
             SelectableText(db.directory),
             const SizedBox(height: 20),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => transfer('backup'),
+                  icon: const Icon(Icons.save_alt, size: 18),
+                  label: const Text('备份全部数据'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => transfer('restore'),
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: const Text('从备份恢复'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => transfer('csv'),
+                  icon: const Icon(Icons.table_chart_outlined, size: 18),
+                  label: const Text('导出 CSV'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => openLocal(db.directory, folder: true),
               icon: const Icon(Icons.folder_open_outlined, size: 18),
@@ -686,7 +833,7 @@ class _WorkspaceState extends State<Workspace> with WidgetsBindingObserver {
             ),
             SizedBox(height: 12),
             Text(
-              '版本 1.0.0 · Windows 桌面版\n无需账号、服务器或订阅。招聘状态由你手动记录。',
+              '版本 1.1.0 · Windows 桌面版\n无需账号、服务器或订阅。招聘状态由你手动记录。',
               style: TextStyle(color: muted, height: 1.8),
             ),
           ],

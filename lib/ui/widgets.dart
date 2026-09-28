@@ -153,11 +153,13 @@ class DateField extends StatelessWidget {
     required this.onChanged,
     required this.label,
     this.firstDate,
+    this.lastDate,
   });
   final DateTime value;
   final ValueChanged<DateTime> onChanged;
   final String label;
   final DateTime? firstDate;
+  final DateTime? lastDate;
   @override
   Widget build(BuildContext context) => InkWell(
     borderRadius: BorderRadius.circular(10),
@@ -166,7 +168,7 @@ class DateField extends StatelessWidget {
         context: context,
         initialDate: value,
         firstDate: firstDate ?? DateTime(1990),
-        lastDate: DateTime.now(),
+        lastDate: lastDate ?? DateTime.now(),
         helpText: label,
       );
       if (picked != null) onChanged(picked);

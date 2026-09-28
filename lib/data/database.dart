@@ -12,7 +12,7 @@ class JobDatabase {
     db.execute('PRAGMA journal_mode = WAL');
     db.execute('PRAGMA busy_timeout = 5000');
     final version = db.select('PRAGMA user_version').first.values.first as int;
-    if (version > 1) {
+    if (version > 2) {
       db.close();
       throw StateError('此数据由更新版本创建，请使用新版 JobTracker。');
     }
@@ -43,6 +43,18 @@ class JobDatabase {
           'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
         );
         db.execute('PRAGMA user_version = 1');
+      });
+    }
+    if (version < 2) {
+      transaction(() {
+        db.execute('ALTER TABLE applications ADD COLUMN follow_up_at TEXT');
+        db.execute(
+          "ALTER TABLE applications ADD COLUMN next_action TEXT NOT NULL DEFAULT ''",
+        );
+        db.execute(
+          'ALTER TABLE applications ADD COLUMN starred INTEGER NOT NULL DEFAULT 0 CHECK(starred IN (0,1))',
+        );
+        db.execute('PRAGMA user_version = 2');
       });
     }
   }
@@ -130,10 +142,13 @@ class JobDatabase {
       record.url.trim(),
       record.notes.trim(),
       record.resumeId,
+      record.followUpAt == null ? null : dateText(record.followUpAt!),
+      record.nextAction.trim(),
+      record.starred ? 1 : 0,
     ];
     if (record.id == null) {
       db.execute(
-        'INSERT INTO applications(company,position,applied_at,stage,status,source,url,notes,resume_id,last_progress) VALUES(?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO applications(company,position,applied_at,stage,status,source,url,notes,resume_id,follow_up_at,next_action,starred,last_progress) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
         [...values, dateText(record.appliedAt)],
       );
       final id = db.lastInsertRowId;
@@ -161,7 +176,7 @@ class JobDatabase {
       throw ArgumentError('投递日期不能晚于已有的最早事件（$firstEvent）');
     }
     db.execute(
-      'UPDATE applications SET company=?,position=?,applied_at=?,stage=?,status=?,source=?,url=?,notes=?,resume_id=? WHERE id=?',
+      'UPDATE applications SET company=?,position=?,applied_at=?,stage=?,status=?,source=?,url=?,notes=?,resume_id=?,follow_up_at=?,next_action=?,starred=? WHERE id=?',
       [...values, record.id],
     );
     if (old['stage'] != record.stage || old['status'] != record.status) {
@@ -223,6 +238,14 @@ class JobDatabase {
 
   void deleteApplication(int id) =>
       db.execute('DELETE FROM applications WHERE id=?', [id]);
+  void toggleStar(int id) => db.execute(
+    'UPDATE applications SET starred = 1 - starred WHERE id=?',
+    [id],
+  );
+  void completeFollowUp(int id) => db.execute(
+    "UPDATE applications SET follow_up_at=NULL, next_action='' WHERE id=?",
+    [id],
+  );
   Future<void> importResume(String source, String name, String version) async {
     if (name.trim().isEmpty || version.trim().isEmpty) {
       throw ArgumentError('请填写简历名称和版本');

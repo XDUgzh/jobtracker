@@ -54,3 +54,9 @@ app.*.map.json
 *.sqlite3-shm
 /local-data/
 *.zip
+*.jobtracker
+*.csv
+/backups/
+/resumes/
+.env
+.env.*

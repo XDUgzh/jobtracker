@@ -1,7 +1,7 @@
 name: jobtracker
 description: 本地优先的中文 Windows 求职管理应用
 publish_to: none
-version: 1.0.0+1
+version: 1.1.0+2
 environment:
   sdk: '>=3.11.0 <4.0.0'
 dependencies:
@@ -21,4 +21,3 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
-

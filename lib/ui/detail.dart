@@ -15,12 +15,14 @@ class DetailPage extends StatelessWidget {
     required this.onEvent,
     required this.onOpenFile,
     required this.onOpenLink,
+    required this.onStar,
+    required this.onComplete,
   });
   final ApplicationRecord record;
   final List<ProgressEvent> events;
   final ResumeRecord? resume;
   final int threshold;
-  final VoidCallback onBack, onEdit, onDelete, onEvent;
+  final VoidCallback onBack, onEdit, onDelete, onEvent, onStar, onComplete;
   final ValueChanged<String> onOpenFile, onOpenLink;
   @override
   Widget build(BuildContext context) {
@@ -160,6 +162,24 @@ class DetailPage extends StatelessWidget {
         const SizedBox(height: 24),
         field('投递日期', dateText(record.appliedAt)),
         field('最后进展', dateText(record.lastProgress)),
+        TextButton.icon(
+          onPressed: onStar,
+          icon: Icon(
+            record.starred ? Icons.star_rounded : Icons.star_border_rounded,
+          ),
+          label: Text(record.starred ? '已收藏 · 点击取消' : '收藏为重点机会'),
+        ),
+        if (record.followUpAt != null) ...[
+          const SizedBox(height: 16),
+          field('下次跟进', dateText(record.followUpAt!)),
+          if (record.nextAction.isNotEmpty) field('下一步', record.nextAction),
+          TextButton.icon(
+            onPressed: onComplete,
+            icon: const Icon(Icons.check_circle_outline, size: 18),
+            label: const Text('完成本次跟进'),
+          ),
+          const SizedBox(height: 16),
+        ],
         field('来源', record.source.isEmpty ? '未填写' : record.source),
         const Text('岗位链接', style: TextStyle(fontSize: 12, color: muted)),
         const SizedBox(height: 6),

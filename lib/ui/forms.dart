@@ -13,10 +13,17 @@ class ApplicationDialog extends StatefulWidget {
 
 class _ApplicationDialogState extends State<ApplicationDialog> {
   final form = GlobalKey<FormState>();
-  late final TextEditingController company, position, source, url, notes;
+  late final TextEditingController company,
+      position,
+      source,
+      url,
+      notes,
+      nextAction;
   late DateTime date;
   late String stage, status;
   int? resumeId;
+  DateTime? followUpAt;
+  bool starred = false;
   String? error;
   @override
   void initState() {
@@ -31,11 +38,14 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
     stage = r?.stage ?? stages.first;
     status = r?.status ?? statuses.first;
     resumeId = r?.resumeId;
+    nextAction = TextEditingController(text: r?.nextAction);
+    followUpAt = r?.followUpAt;
+    starred = r?.starred ?? false;
   }
 
   @override
   void dispose() {
-    for (final c in [company, position, source, url, notes]) {
+    for (final c in [company, position, source, url, notes, nextAction]) {
       c.dispose();
     }
     super.dispose();
@@ -56,6 +66,9 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
           url: url.text,
           notes: notes.text,
           resumeId: resumeId,
+          followUpAt: followUpAt,
+          nextAction: nextAction.text,
+          starred: starred,
           lastProgress: widget.record?.lastProgress ?? date,
         ),
       );
@@ -194,6 +207,43 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
                 '修改阶段或状态会自动写入时间轴；仅修改备注不会重置等待天数。',
                 style: TextStyle(fontSize: 12, color: muted),
               ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('收藏为重点机会'),
+                value: starred,
+                onChanged: (value) => setState(() => starred = value),
+              ),
+              SwitchListTile(
+                key: const Key('followUpSwitch'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('安排下次跟进'),
+                subtitle: const Text('到期后在首页提醒，不改变招聘进度'),
+                value: followUpAt != null,
+                onChanged: (value) => setState(
+                  () =>
+                      followUpAt = value ? calendarDate(DateTime.now()) : null,
+                ),
+              ),
+              if (followUpAt != null) ...[
+                const SizedBox(height: 12),
+                DateField(
+                  value: followUpAt!,
+                  lastDate: DateTime(DateTime.now().year + 10),
+                  onChanged: (value) => setState(() => followUpAt = value),
+                  label: '下次跟进日期',
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const Key('nextActionField'),
+                  controller: nextAction,
+                  maxLength: 300,
+                  decoration: const InputDecoration(
+                    labelText: '下一步要做什么',
+                    hintText: '例如：询问结果 / 准备二面 / 确认 Offer',
+                  ),
+                ),
+              ],
               if (error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
