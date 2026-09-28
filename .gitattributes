@@ -1,0 +1,6 @@
+* text=auto
+*.dart text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf
+*.ico binary

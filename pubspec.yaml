@@ -1,0 +1,24 @@
+name: jobtracker
+description: 本地优先的中文 Windows 求职管理应用
+publish_to: none
+version: 1.0.0+1
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  file_selector: ^1.0.4
+  path: ^1.9.1
+  sqlite3: ^3.1.0
+  url_launcher: ^6.3.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+
